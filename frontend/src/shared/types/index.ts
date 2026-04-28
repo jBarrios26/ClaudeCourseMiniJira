@@ -74,6 +74,7 @@ export interface DashboardMetrics {
 }
 
 export interface TicketFilters {
+  search?: string
   status?: TicketStatus
   priority?: TicketPriority
   assigneeId?: string

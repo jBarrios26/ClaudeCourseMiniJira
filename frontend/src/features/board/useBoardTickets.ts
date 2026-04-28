@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { Ticket, User } from '@/shared/types'
+import type { Ticket, User, TicketFilters } from '@/shared/types'
 
 // ─── Mock users ──────────────────────────────────────────────────────────────
 const LAURA:   User = { id: '00000000-0000-0000-0000-000000000001', name: 'Laura Gómez',    email: 'laura@company.internal',   role: 'admin', removedAt: null }
@@ -148,14 +148,55 @@ const MOCK_TICKETS: Ticket[] = [
   },
 ]
 
-export function useBoardTickets() {
+export function useBoardTickets(filters?: TicketFilters) {
   return useQuery<Ticket[]>({
-    queryKey: ['tickets'],
+    queryKey: ['tickets', filters],
     queryFn: import.meta.env.DEV
-      ? () => Promise.resolve(MOCK_TICKETS)
-      : () =>
-          fetch(`${import.meta.env.VITE_API_BASE_URL}/tickets`)
-            .then((r) => r.json()),
+      ? () => {
+          let docs = MOCK_TICKETS
+          if (filters) {
+            if (filters.search) {
+              const lowerSearch = filters.search.toLowerCase()
+              docs = docs.filter((t) => t.title.toLowerCase().includes(lowerSearch) || (t.description?.toLowerCase().includes(lowerSearch)))
+            }
+            if (filters.status) docs = docs.filter((t) => t.status === filters.status)
+            if (filters.priority) docs = docs.filter((t) => t.priority === filters.priority)
+            if (filters.assigneeId) docs = docs.filter((t) => t.assigneeId === filters.assigneeId)
+            if (filters.labels && filters.labels.length > 0) {
+              docs = docs.filter((t) =>
+                filters.labels!.every((labelName) => t.labels.some((l) => l.name === labelName))
+              )
+            }
+            if (filters.from) {
+              docs = docs.filter((t) => new Date(t.createdAt) >= new Date(filters.from!))
+            }
+            if (filters.to) {
+              docs = docs.filter((t) => new Date(t.createdAt) <= new Date(filters.to!))
+            }
+            if (filters.archived) {
+               // If archived is true, it theoretically includes them, or it filters for ONLY archived.
+               // Normally `visibleTickets` inside `BoardPage` filters out archived=null if `showArchived` is false.
+               // We will let `BoardPage` handle the toggle or if we pass it, we can just fetch all.
+            }
+          }
+          return Promise.resolve(docs)
+        }
+      : () => {
+          const params = new URLSearchParams()
+          if (filters) {
+            Object.entries(filters).forEach(([key, val]) => {
+              if (val !== undefined && val !== '') {
+                if (Array.isArray(val)) {
+                  val.forEach((v) => params.append(`${key}[]`, v))
+                } else {
+                  params.append(key, String(val))
+                }
+              }
+            })
+          }
+          return fetch(`${import.meta.env.VITE_API_BASE_URL}/tickets?${params.toString()}`)
+            .then((r) => r.json())
+        },
     staleTime: 30_000,
   })
 }

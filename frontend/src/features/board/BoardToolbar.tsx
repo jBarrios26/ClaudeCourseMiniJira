@@ -1,12 +1,17 @@
+import { useState } from 'react'
 import { ChevronRight, Plus, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { User } from '@/shared/types'
+import type { User, TicketFilters } from '@/shared/types'
+import { FilterBar } from './FilterBar'
 
 interface BoardToolbarProps {
   members: User[]
   showArchived: boolean
   onToggleArchived: (val: boolean) => void
   isAdmin: boolean
+  filters: TicketFilters
+  onFilterChange: (f: TicketFilters) => void
+  onNewTicketClick?: () => void
 }
 
 function AvatarStack({ members }: { members: User[] }) {
@@ -41,7 +46,8 @@ function AvatarStack({ members }: { members: User[] }) {
   )
 }
 
-export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin }: BoardToolbarProps) {
+export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin, filters, onFilterChange, onNewTicketClick }: BoardToolbarProps) {
+  const [showFilters, setShowFilters] = useState(Object.keys(filters).length > 0)
   return (
     <div className="mb-8">
       {/* Breadcrumb */}
@@ -84,7 +90,8 @@ export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin 
 
           <button
             type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-md text-inverse_surface border border-outline_variant/20 hover:bg-surface_container_high transition-colors"
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-md transition-colors border", showFilters ? "bg-primary_container text-on_primary_container border-primary/20" : "text-inverse_surface border-outline_variant/20 hover:bg-surface_container_high")}
           >
             <SlidersHorizontal size={14} />
             Filter
@@ -92,6 +99,7 @@ export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin 
 
           <button
             type="button"
+            onClick={onNewTicketClick}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-md text-on_primary font-medium transition-opacity hover:opacity-90"
             style={{ background: 'linear-gradient(145deg, #005bbf, #0050a8)' }}
           >
@@ -100,6 +108,10 @@ export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin 
           </button>
         </div>
       </div>
+
+      {showFilters && (
+        <FilterBar filters={filters} onChange={onFilterChange} members={members} />
+      )}
     </div>
   )
 }

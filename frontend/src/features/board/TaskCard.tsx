@@ -1,7 +1,9 @@
 import { useDraggable } from '@dnd-kit/core'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Archive, ArchiveRestore } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useBoardStore } from '@/shared/stores/boardStore'
+import { useAuthStore } from '@/shared/stores/authStore'
+import { useUpdateTicket } from '@/features/tickets/useUpdateTicket'
 import type { Ticket, TicketPriority } from '@/shared/types'
 
 export interface TaskCardProps {
@@ -35,7 +37,28 @@ export function TaskCard({ ticket, isDragging }: TaskCardProps) {
   const isPendingMove = useBoardStore((s) => s.pendingMoveId === ticket.id)
   const { className: priorityClass, label: priorityLabel } = PRIORITY_VARIANTS[ticket.priority]
 
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: ticket.id })
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = user?.role === 'admin'
+  const isOwner = ticket.createdBy?.id === user?.id
+  const canArchive = isAdmin || isOwner
+  const canRestore = isAdmin
+  
+  const { mutate: updateTicket, isPending } = useUpdateTicket()
+
+  const handleArchiveToggle = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click if there's any
+    const payload = {
+      id: ticket.id,
+      archivedAt: ticket.archivedAt ? null : new Date().toISOString(),
+      version: ticket.version
+    }
+    updateTicket(payload)
+  }
+
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ 
+    id: ticket.id,
+    disabled: ticket.archivedAt !== null // Do not allow dragging if archived
+  })
 
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -48,18 +71,53 @@ export function TaskCard({ ticket, isDragging }: TaskCardProps) {
       {...listeners}
       {...attributes}
       className={cn(
-        'bg-surface_container_lowest shadow-ambient rounded-lg pt-4 pl-4 pr-3 pb-3 flex flex-col gap-2.5 cursor-grab select-none',
+        'bg-surface_container_lowest shadow-ambient rounded-lg pt-4 pl-4 pr-3 pb-3 flex flex-col gap-2.5 cursor-grab select-none relative group',
         isBlocked && 'border-l-2 border-error_container',
         isDragging && 'opacity-50 rotate-1',
         isPendingMove && 'ring-2 ring-primary/40',
+        ticket.archivedAt && 'opacity-60 grayscale-[0.3]'
       )}
     >
+      {/* Archive / Restore Button overlay (shows on hover) */}
+       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {!ticket.archivedAt && canArchive && (
+          <button
+            type="button"
+            className="p-1.5 rounded-md bg-surface_container_high text-inverse_surface/70 hover:text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+            title="Archive Ticket"
+            onClick={handleArchiveToggle}
+            disabled={isPending}
+            onPointerDown={(e) => e.stopPropagation()} // Let button handle click without drag interferences
+          >
+            <Archive size={14} />
+          </button>
+        )}
+        {ticket.archivedAt && canRestore && (
+          <button
+            type="button"
+            className="p-1.5 rounded-md bg-surface_container_high text-inverse_surface/70 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+            title="Restore Ticket"
+            onClick={handleArchiveToggle}
+            disabled={isPending}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <ArchiveRestore size={14} />
+          </button>
+        )}
+      </div>
       {/* Header row */}
-      <div className="flex items-center justify-between gap-2">
-        <span className={cn('text-label-sm px-2 py-0.5 rounded-md font-medium', priorityClass)}>
-          {priorityLabel}
-        </span>
-        <span className="text-label-sm text-inverse_surface/40 shrink-0">
+      <div className="flex items-center justify-between gap-2 mr-8">
+        <div className="flex gap-2 items-center flex-wrap">
+          <span className={cn('text-label-sm px-2 py-0.5 rounded-md font-medium', priorityClass)}>
+            {priorityLabel}
+          </span>
+          {ticket.archivedAt && (
+            <span className="text-label-sm px-2 py-0.5 rounded-md font-medium bg-outline/20 text-inverse_surface/60">
+              Archivado
+            </span>
+          )}
+        </div>
+        <span className="text-label-sm text-inverse_surface/40 shrink-0 hidden sm:inline">
           {ticket.id.slice(0, 8).toUpperCase()}
         </span>
       </div>

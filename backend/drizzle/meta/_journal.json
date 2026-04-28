@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1777336461607,
+      "tag": "0000_neat_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1777337188122,
+      "tag": "0001_open_hydra",
+      "breakpoints": true
+    }
+  ]
+}

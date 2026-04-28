@@ -1,0 +1,175 @@
+database:
+  engine: SQLite
+  orm: Drizzle ORM (drizzle-orm/better-sqlite3)
+  timestamps: unix_epoch_seconds  # all integer timestamp columns store seconds since epoch
+
+tables:
+
+  users:
+    description: Team members with login credentials and role.
+    columns:
+      id:
+        type: integer
+        primaryKey: true
+        autoIncrement: true
+      name:
+        type: text
+        notNull: true
+      email:
+        type: text
+        notNull: true
+        unique: true
+      password_hash:
+        type: text
+        notNull: true
+      role:
+        type: text
+        notNull: true
+        default: user
+        enum: [user, admin]
+      created_at:
+        type: integer
+        notNull: true
+
+  tickets:
+    description: Core work items tracked on the Kanban board.
+    columns:
+      id:
+        type: integer
+        primaryKey: true
+        autoIncrement: true
+      title:
+        type: text
+        notNull: true
+        maxLength: 120
+      description:
+        type: text
+        nullable: true
+      status:
+        type: text
+        notNull: true
+        default: to_do
+        enum: [to_do, in_progress, in_review, done]
+      priority:
+        type: text
+        notNull: true
+        default: medium
+        enum: [low, medium, high]
+      assignee_id:
+        type: integer
+        nullable: true
+        references:
+          table: users
+          column: id
+          onDelete: SET NULL
+      created_by:
+        type: integer
+        nullable: true  # becomes null if creator is deleted
+        references:
+          table: users
+          column: id
+          onDelete: SET NULL
+      version:
+        type: integer
+        notNull: true
+        default: 1
+        description: Incremented on every PATCH. Used for optimistic locking.
+      is_archived:
+        type: integer
+        notNull: true
+        default: 0
+        description: Boolean stored as 0 (active) or 1 (archived).
+      archived_at:
+        type: integer
+        nullable: true
+        description: Unix timestamp set when is_archived becomes 1. NULL when active.
+      created_at:
+        type: integer
+        notNull: true
+      updated_at:
+        type: integer
+        notNull: true
+
+  labels:
+    description: Reusable free-form tags attached to tickets.
+    columns:
+      id:
+        type: integer
+        primaryKey: true
+        autoIncrement: true
+      name:
+        type: text
+        notNull: true
+        unique: true
+
+  ticket_labels:
+    description: Many-to-many junction between tickets and labels.
+    primaryKey: [ticket_id, label_id]
+    columns:
+      ticket_id:
+        type: integer
+        notNull: true
+        references:
+          table: tickets
+          column: id
+          onDelete: CASCADE
+      label_id:
+        type: integer
+        notNull: true
+        references:
+          table: labels
+          column: id
+          onDelete: CASCADE
+
+  comments:
+    description: Append-only comments on tickets. No edit or delete.
+    columns:
+      id:
+        type: integer
+        primaryKey: true
+        autoIncrement: true
+      ticket_id:
+        type: integer
+        notNull: true
+        references:
+          table: tickets
+          column: id
+          onDelete: CASCADE
+      author_id:
+        type: integer
+        nullable: true  # becomes null if author is deleted; comment is preserved
+        references:
+          table: users
+          column: id
+          onDelete: SET NULL
+      body:
+        type: text
+        notNull: true
+      created_at:
+        type: integer
+        notNull: true
+
+relationships:
+  - tickets.assignee_id → users.id (SET NULL on delete)
+  - tickets.created_by → users.id (SET NULL on delete)
+  - ticket_labels.ticket_id → tickets.id (CASCADE on delete)
+  - ticket_labels.label_id → labels.id (CASCADE on delete)
+  - comments.ticket_id → tickets.id (CASCADE on delete)
+  - comments.author_id → users.id (SET NULL on delete)
+
+indexes:
+  tickets:
+    - column: status
+      reason: board filtering by status
+    - column: assignee_id
+      reason: filtering and metrics top-assignees query
+    - column: created_at
+      reason: date-range filtering and metrics aggregation
+    - column: is_archived
+      reason: default filter on all board queries
+  ticket_labels:
+    - column: label_id
+      reason: filter tickets by label
+  comments:
+    - column: ticket_id
+      reason: fetch all comments for a ticket

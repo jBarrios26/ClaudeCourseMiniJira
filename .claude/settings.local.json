@@ -4,5 +4,18 @@
       "Bash(npx shadcn@latest add sonner tooltip popover command)",
       "Bash(npx tsc *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | grep -q 'rm -rf' && echo '{\"decision\":\"block\",\"reason\":\"rm -rf está bloqueado por política del proyecto.\"}' || true"
+          }
+        ]
+      }
+    ]
   }
 }
