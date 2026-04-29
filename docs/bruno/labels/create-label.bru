@@ -1,0 +1,21 @@
+meta {
+  name: Create Label
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/labels
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "bug"
+  }
+}

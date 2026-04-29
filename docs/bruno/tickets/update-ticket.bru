@@ -1,0 +1,26 @@
+meta {
+  name: Update Ticket
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/tickets/1
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "version": 1,
+    "title": "Fix login bug (updated)",
+    "status": "in_progress",
+    "priority": "high",
+    "assignee_id": 2,
+    "label_ids": [1]
+  }
+}

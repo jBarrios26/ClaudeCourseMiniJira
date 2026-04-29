@@ -2,6 +2,9 @@ import { NextFunction, Response } from 'express';
 import { AuthRequest } from './auth';
 
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
-  // TODO: check req.user.role === 'admin', return 403 otherwise
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({ error: 'Insufficient role' });
+    return;
+  }
   next();
 }

@@ -1,0 +1,21 @@
+meta {
+  name: Post Comment
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/tickets/1/comments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "body": "This is a comment on the ticket."
+  }
+}

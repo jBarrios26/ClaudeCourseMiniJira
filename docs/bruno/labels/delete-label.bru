@@ -1,0 +1,15 @@
+meta {
+  name: Delete Label
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/labels/1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

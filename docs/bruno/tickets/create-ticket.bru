@@ -1,0 +1,26 @@
+meta {
+  name: Create Ticket
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/tickets
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Fix login bug",
+    "description": "Users cannot log in with special characters in their password.",
+    "status": "to_do",
+    "priority": "high",
+    "assignee_id": 2,
+    "label_ids": [1, 2]
+  }
+}

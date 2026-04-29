@@ -1,0 +1,25 @@
+meta {
+  name: List Tickets
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/tickets
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  ~status: to_do
+  ~priority: medium
+  ~assignee_id: 1
+  ~label_id: 1
+  ~from: 2024-01-01
+  ~to: 2024-12-31
+  ~is_archived: false
+}

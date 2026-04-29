@@ -1,0 +1,15 @@
+meta {
+  name: Archive Ticket
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/tickets/1/archive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -201,11 +201,209 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-// ─── Remaining endpoints (stubs) ─────────────────────────────────────────────
+// ─── GET /tickets/:id ────────────────────────────────────────────────────────
 
-router.get('/:id',           authenticate,               (_req, res) => { res.sendStatus(501); });
-router.patch('/:id',         authenticate,               (_req, res) => { res.sendStatus(501); });
-router.patch('/:id/archive', authenticate,               (_req, res) => { res.sendStatus(501); });
-router.patch('/:id/restore', authenticate, requireAdmin, (_req, res) => { res.sendStatus(501); });
+router.get('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    const [ticketData, labelData] = await Promise.all([
+      db
+        .select(TICKET_SELECT)
+        .from(tickets)
+        .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+        .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+        .where(eq(tickets.id, id)),
+      db
+        .select({ id: labels.id, name: labels.name })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(ticketLabels.labelId, labels.id))
+        .where(eq(ticketLabels.ticketId, id)),
+    ]);
+
+    if (!ticketData[0]) { res.status(404).json({ error: 'Ticket not found' }); return; }
+    res.json(shapeTicket(ticketData[0]!, labelData));
+  } catch (err) {
+    console.error('[GET /tickets/:id]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── PATCH /tickets/:id ───────────────────────────────────────────────────────
+
+const ticketPatchSchema = z.object({
+  version:     z.number().int().positive(),
+  title:       z.string().min(1).max(120).optional(),
+  description: z.string().nullable().optional(),
+  status:      z.enum(['to_do', 'in_progress', 'in_review', 'done']).optional(),
+  priority:    z.enum(['low', 'medium', 'high']).optional(),
+  assignee_id: z.number().int().positive().nullable().optional(),
+  label_ids:   z.array(z.number().int().positive()).optional(),
+});
+
+router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    const parsed = ticketPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
+      return;
+    }
+
+    const { version, title, description, status, priority, assignee_id, label_ids } = parsed.data;
+
+    const [current] = await db
+      .select({ ...TICKET_SELECT, createdByName: creatorUser.name })
+      .from(tickets)
+      .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+      .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+      .where(eq(tickets.id, id));
+
+    if (!current) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    if (req.user!.role === 'user' && current.createdById !== req.user!.id) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    if (current.version !== version) {
+      res.status(409).json({
+        error:         'conflict',
+        updatedById:   current.createdById,
+        updatedByName: current.createdByName,
+      });
+      return;
+    }
+
+    const ts = unixNow();
+    const updates: Record<string, unknown> = { version: current.version + 1, updatedAt: ts };
+    if (title       !== undefined) updates.title       = title;
+    if (description !== undefined) updates.description = description;
+    if (status      !== undefined) updates.status      = status;
+    if (priority    !== undefined) updates.priority    = priority;
+    if ('assignee_id' in parsed.data) updates.assigneeId = assignee_id ?? null;
+
+    await db.update(tickets).set(updates).where(eq(tickets.id, id));
+
+    if (label_ids !== undefined) {
+      await db.delete(ticketLabels).where(eq(ticketLabels.ticketId, id));
+      if (label_ids.length > 0) {
+        await db.insert(ticketLabels).values(label_ids.map(lid => ({ ticketId: id, labelId: lid })));
+      }
+    }
+
+    const [ticketData, labelData] = await Promise.all([
+      db
+        .select(TICKET_SELECT)
+        .from(tickets)
+        .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+        .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+        .where(eq(tickets.id, id)),
+      db
+        .select({ id: labels.id, name: labels.name })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(ticketLabels.labelId, labels.id))
+        .where(eq(ticketLabels.ticketId, id)),
+    ]);
+
+    res.json(shapeTicket(ticketData[0]!, labelData));
+  } catch (err) {
+    console.error('[PATCH /tickets/:id]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── PATCH /tickets/:id/archive ───────────────────────────────────────────────
+
+router.patch('/:id/archive', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    const [current] = await db
+      .select(TICKET_SELECT)
+      .from(tickets)
+      .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+      .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+      .where(eq(tickets.id, id));
+
+    if (!current) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    if (req.user!.role === 'user' && current.createdById !== req.user!.id) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    if (current.isArchived) {
+      res.status(409).json({ error: 'Already archived' });
+      return;
+    }
+
+    const ts = unixNow();
+    await db.update(tickets).set({ isArchived: true, archivedAt: ts, updatedAt: ts }).where(eq(tickets.id, id));
+
+    const [ticketData, labelData] = await Promise.all([
+      db
+        .select(TICKET_SELECT)
+        .from(tickets)
+        .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+        .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+        .where(eq(tickets.id, id)),
+      db
+        .select({ id: labels.id, name: labels.name })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(ticketLabels.labelId, labels.id))
+        .where(eq(ticketLabels.ticketId, id)),
+    ]);
+
+    res.json(shapeTicket(ticketData[0]!, labelData));
+  } catch (err) {
+    console.error('[PATCH /tickets/:id/archive]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── PATCH /tickets/:id/restore ───────────────────────────────────────────────
+
+router.patch('/:id/restore', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    const [current] = await db
+      .select(TICKET_SELECT)
+      .from(tickets)
+      .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+      .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+      .where(eq(tickets.id, id));
+
+    if (!current) { res.status(404).json({ error: 'Ticket not found' }); return; }
+
+    const ts = unixNow();
+    await db.update(tickets).set({ isArchived: false, archivedAt: null, updatedAt: ts }).where(eq(tickets.id, id));
+
+    const [ticketData, labelData] = await Promise.all([
+      db
+        .select(TICKET_SELECT)
+        .from(tickets)
+        .leftJoin(assigneeUser, eq(tickets.assigneeId, assigneeUser.id))
+        .leftJoin(creatorUser,  eq(tickets.createdBy,  creatorUser.id))
+        .where(eq(tickets.id, id)),
+      db
+        .select({ id: labels.id, name: labels.name })
+        .from(ticketLabels)
+        .innerJoin(labels, eq(ticketLabels.labelId, labels.id))
+        .where(eq(ticketLabels.ticketId, id)),
+    ]);
+
+    res.json(shapeTicket(ticketData[0]!, labelData));
+  } catch (err) {
+    console.error('[PATCH /tickets/:id/restore]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 export default router;
