@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db/client';
-import { labels, ticketLabels, tickets, users } from '../db/schema';
+import { labels, projects, ticketLabels, tickets, users } from '../db/schema';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/requireAdmin';
 
@@ -22,6 +22,7 @@ function shapeTicket(
     status: string; priority: string;
     assigneeId: number | null; assigneeName: string | null;
     createdById: number | null; createdByName: string | null;
+    projectId: number | null;
     version: number; isArchived: boolean; archivedAt: number | null;
     createdAt: number; updatedAt: number;
   },
@@ -35,6 +36,7 @@ function shapeTicket(
     priority:    t.priority,
     assignee:    t.assigneeId != null ? { id: t.assigneeId, name: t.assigneeName! } : null,
     created_by:  t.createdById != null ? { id: t.createdById, name: t.createdByName! } : null,
+    project_id:  t.projectId,
     labels:      ticketLabels,
     version:     t.version,
     is_archived: t.isArchived,
@@ -54,6 +56,7 @@ const TICKET_SELECT = {
   assigneeName:  assigneeUser.name,
   createdById:   creatorUser.id,
   createdByName: creatorUser.name,
+  projectId:     tickets.projectId,
   version:       tickets.version,
   isArchived:    tickets.isArchived,
   archivedAt:    tickets.archivedAt,
@@ -68,6 +71,7 @@ const getTicketsSchema = z.object({
   priority:    z.enum(['low', 'medium', 'high']).optional(),
   assignee_id: z.coerce.number().int().positive().optional(),
   label_id:    z.coerce.number().int().positive().optional(),
+  project_id:  z.coerce.number().int().positive().optional(),
   from:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD').optional(),
   to:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD').optional(),
   is_archived: z.enum(['true', 'false']).optional(),
@@ -81,7 +85,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       return;
     }
 
-    const { status, priority, assignee_id, label_id, from, to, is_archived } = parsed.data;
+    const { status, priority, assignee_id, label_id, project_id, from, to, is_archived } = parsed.data;
     const isArchivedFilter = is_archived === 'true';
 
     if (isArchivedFilter && req.user!.role !== 'admin') {
@@ -93,6 +97,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     if (status)      conditions.push(eq(tickets.status, status));
     if (priority)    conditions.push(eq(tickets.priority, priority));
     if (assignee_id) conditions.push(eq(tickets.assigneeId, assignee_id));
+    if (project_id)  conditions.push(eq(tickets.projectId, project_id));
     if (from)        conditions.push(gte(tickets.createdAt, Math.floor(new Date(`${from}T00:00:00Z`).getTime() / 1000)));
     if (to)          conditions.push(lte(tickets.createdAt, Math.floor(new Date(`${to}T23:59:59Z`).getTime()  / 1000)));
 
@@ -145,6 +150,7 @@ const ticketCreateSchema = z.object({
   status:      z.enum(['to_do', 'in_progress', 'in_review', 'done']).default('to_do'),
   priority:    z.enum(['low', 'medium', 'high']).default('medium'),
   assignee_id: z.number().int().positive().nullable().optional(),
+  project_id:  z.number().int().positive().nullable().optional(),
   label_ids:   z.array(z.number().int().positive()).default([]),
 });
 
@@ -156,7 +162,7 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       return;
     }
 
-    const { title, description, status, priority, assignee_id, label_ids } = parsed.data;
+    const { title, description, status, priority, assignee_id, project_id, label_ids } = parsed.data;
     const ts = unixNow();
 
     const [inserted] = await db.insert(tickets).values({
@@ -165,6 +171,7 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       status,
       priority,
       assigneeId: assignee_id ?? null,
+      projectId:  project_id ?? null,
       createdBy:  req.user!.id,
       version:    1,
       isArchived: false,
@@ -239,6 +246,7 @@ const ticketPatchSchema = z.object({
   status:      z.enum(['to_do', 'in_progress', 'in_review', 'done']).optional(),
   priority:    z.enum(['low', 'medium', 'high']).optional(),
   assignee_id: z.number().int().positive().nullable().optional(),
+  project_id:  z.number().int().positive().nullable().optional(),
   label_ids:   z.array(z.number().int().positive()).optional(),
 });
 
@@ -253,7 +261,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
       return;
     }
 
-    const { version, title, description, status, priority, assignee_id, label_ids } = parsed.data;
+    const { version, title, description, status, priority, assignee_id, project_id, label_ids } = parsed.data;
 
     const [current] = await db
       .select({ ...TICKET_SELECT, createdByName: creatorUser.name })
@@ -285,6 +293,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
     if (status      !== undefined) updates.status      = status;
     if (priority    !== undefined) updates.priority    = priority;
     if ('assignee_id' in parsed.data) updates.assigneeId = assignee_id ?? null;
+    if ('project_id'  in parsed.data) updates.projectId  = project_id  ?? null;
 
     await db.update(tickets).set(updates).where(eq(tickets.id, id));
 

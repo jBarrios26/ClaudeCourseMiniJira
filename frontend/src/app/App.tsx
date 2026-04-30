@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { BoardPage } from '@/features/board/BoardPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { AdminMembersPage } from '@/features/admin/AdminMembersPage'
+import { AdminProjectsPage } from '@/features/admin/AdminProjectsPage'
 
 const router = createBrowserRouter([
   {
@@ -24,7 +25,10 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           {
             element: <AdminRoute />,
-            children: [{ path: 'admin/members', element: <AdminMembersPage /> }],
+            children: [
+              { path: 'admin/members', element: <AdminMembersPage /> },
+              { path: 'admin/projects', element: <AdminProjectsPage /> },
+            ],
           },
         ],
       },

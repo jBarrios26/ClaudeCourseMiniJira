@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/shared/stores/authStore'
+import { login } from '@/shared/api/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,10 @@ const MOCK_USERS: User[] = [
 export function LoginPage() {
   const { user, setAuth } = useAuthStore()
   const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (user) navigate('/board', { replace: true })
@@ -29,6 +34,21 @@ export function LoginPage() {
   function loginAs(mockUser: User) {
     setAuth(mockUser, 'dev-token')
     navigate('/board', { replace: true })
+  }
+
+  async function handleSubmit(e: React.SyntheticEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const { token, user: loggedUser } = await login(email, password)
+      setAuth(loggedUser, token)
+      navigate('/board', { replace: true })
+    } catch {
+      setError('Invalid credentials')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -42,17 +62,34 @@ export function LoginPage() {
             <p className="text-sm text-muted-foreground mt-1">Inicia sesión para continuar</p>
           </div>
 
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="tu@empresa.com" autoComplete="email" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="tu@empresa.com"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" placeholder="••••••••" autoComplete="current-password" />
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
             </div>
-            <Button type="submit" className="w-full" disabled>
-              Entrar
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Entrando…' : 'Entrar'}
             </Button>
           </form>
         </div>

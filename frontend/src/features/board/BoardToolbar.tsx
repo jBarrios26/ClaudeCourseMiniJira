@@ -12,6 +12,8 @@ interface BoardToolbarProps {
   filters: TicketFilters
   onFilterChange: (f: TicketFilters) => void
   onNewTicketClick?: () => void
+  projectName: string
+  onSwitchProject: () => void
 }
 
 function AvatarStack({ members }: { members: User[] }) {
@@ -46,15 +48,20 @@ function AvatarStack({ members }: { members: User[] }) {
   )
 }
 
-export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin, filters, onFilterChange, onNewTicketClick }: BoardToolbarProps) {
+export function BoardToolbar({ members, showArchived, onToggleArchived, isAdmin, filters, onFilterChange, onNewTicketClick, projectName, onSwitchProject }: BoardToolbarProps) {
   const [showFilters, setShowFilters] = useState(Object.keys(filters).length > 0)
   return (
     <div className="mb-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 mb-2">
-        <span className="text-label-sm text-inverse_surface/40">Projects</span>
+        <button
+          onClick={onSwitchProject}
+          className="text-label-sm text-inverse_surface/40 hover:text-inverse_surface/70 transition-colors uppercase tracking-wide"
+        >
+          Projects
+        </button>
         <ChevronRight size={12} className="text-inverse_surface/30" />
-        <span className="text-label-sm text-inverse_surface/40">Board</span>
+        <span className="text-label-sm text-inverse_surface/60 uppercase tracking-wide">{projectName}</span>
       </div>
 
       {/* Title row */}

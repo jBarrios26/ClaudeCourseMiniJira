@@ -9,6 +9,14 @@ export const users = sqliteTable('users', {
   createdAt:    integer('created_at').notNull(),
 });
 
+export const projects = sqliteTable('projects', {
+  id:          integer('id').primaryKey({ autoIncrement: true }),
+  name:        text('name').notNull().unique(),
+  description: text('description'),
+  createdAt:   integer('created_at').notNull(),
+  updatedAt:   integer('updated_at').notNull(),
+});
+
 export const tickets = sqliteTable('tickets', {
   id:          integer('id').primaryKey({ autoIncrement: true }),
   title:       text('title').notNull(),
@@ -17,6 +25,7 @@ export const tickets = sqliteTable('tickets', {
   priority:    text('priority', { enum: ['low', 'medium', 'high'] }).notNull().default('medium'),
   assigneeId:  integer('assignee_id').references(() => users.id, { onDelete: 'set null' }),
   createdBy:   integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  projectId:   integer('project_id').references(() => projects.id, { onDelete: 'set null' }),
   version:     integer('version').notNull().default(1),
   isArchived:  integer('is_archived', { mode: 'boolean' }).notNull().default(false),
   archivedAt:  integer('archived_at'),
@@ -27,6 +36,7 @@ export const tickets = sqliteTable('tickets', {
   index('idx_tickets_assignee_id').on(t.assigneeId),
   index('idx_tickets_created_at').on(t.createdAt),
   index('idx_tickets_is_archived').on(t.isArchived),
+  index('idx_tickets_project_id').on(t.projectId),
 ]);
 
 export const labels = sqliteTable('labels', {

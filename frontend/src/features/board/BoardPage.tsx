@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/shared/stores/authStore'
+import { useProjectStore } from '@/shared/stores/projectStore'
 import { BoardToolbar } from './BoardToolbar'
 import { KanbanBoard } from './KanbanBoard'
 import { useBoardTickets, MOCK_MEMBERS } from './useBoardTickets'
 import { TicketModal } from '@/features/tickets/TicketModal'
+import { ProjectSelectorPage } from '@/features/projects/ProjectSelectorPage'
+import { useProjects } from '@/features/projects/useProjects'
 import type { TicketFilters } from '@/shared/types'
 
 function BoardSkeleton() {
@@ -30,7 +33,15 @@ export function BoardPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
 
-  const { data: tickets, isLoading, isError } = useBoardTickets(filters)
+  const { activeProjectId, setActiveProject } = useProjectStore()
+  const { data: projects } = useProjects()
+  const activeProject = projects?.find((p) => p.id === activeProjectId)
+
+  const { data: tickets, isLoading, isError } = useBoardTickets(
+    activeProjectId !== null ? { ...filters, projectId: activeProjectId } : filters,
+  )
+
+  if (activeProjectId === null) return <ProjectSelectorPage />
 
   const visibleTickets = (tickets ?? []).filter((t) =>
     showArchived ? true : t.archivedAt === null,
@@ -46,6 +57,8 @@ export function BoardPage() {
         filters={filters}
         onFilterChange={setFilters}
         onNewTicketClick={() => setIsModalOpen(true)}
+        projectName={activeProject?.name ?? '…'}
+        onSwitchProject={() => setActiveProject(null)}
       />
 
       {isLoading && <BoardSkeleton />}
@@ -61,10 +74,10 @@ export function BoardPage() {
       )}
 
       {isModalOpen && (
-        <TicketModal 
-          open={isModalOpen} 
-          onOpenChange={setIsModalOpen} 
-          members={MOCK_MEMBERS} 
+        <TicketModal
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          members={MOCK_MEMBERS}
         />
       )}
     </div>

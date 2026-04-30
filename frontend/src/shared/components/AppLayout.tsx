@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { BarChart2, LayoutGrid, Users } from 'lucide-react'
+import { BarChart2, FolderKanban, LayoutGrid, Users } from 'lucide-react'
 import { useAuthStore } from '@/shared/stores/authStore'
 import { DraftBanner } from './DraftBanner'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,9 @@ export function AppLayout() {
           <SideNavLink to="/dashboard" icon={<BarChart2 size={16} />}>Dashboard</SideNavLink>
           {user?.role === 'admin' && (
             <SideNavLink to="/admin/members" icon={<Users size={16} />}>Members</SideNavLink>
+          )}
+          {user?.role === 'admin' && (
+            <SideNavLink to="/admin/projects" icon={<FolderKanban size={16} />}>Projects</SideNavLink>
           )}
         </nav>
         <div className="px-5 py-4 text-body-md text-inverse_surface/50 truncate">

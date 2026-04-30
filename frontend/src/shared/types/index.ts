@@ -1,4 +1,22 @@
 export type UserRole = 'user' | 'admin'
+
+export interface Project {
+  id: number
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateProjectPayload {
+  name: string
+  description?: string | null
+}
+
+export interface UpdateProjectPayload {
+  name?: string
+  description?: string | null
+}
 export type TicketStatus = 'to_do' | 'in_progress' | 'in_review' | 'done'
 export type TicketPriority = 'low' | 'medium' | 'high'
 
@@ -24,6 +42,7 @@ export interface Ticket {
   assigneeId: string | null
   assignee: User | null
   createdBy: User | null
+  projectId: number | null
   labels: Label[]
   version: number
   archivedAt: string | null
@@ -78,6 +97,7 @@ export interface TicketFilters {
   status?: TicketStatus
   priority?: TicketPriority
   assigneeId?: string
+  projectId?: number
   labels?: string[]
   from?: string
   to?: string
