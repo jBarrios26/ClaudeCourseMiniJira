@@ -1,0 +1,15 @@
+{
+  "name": "mini-jira-docs",
+  "private": true,
+  "scripts": {
+    "agent:api":       "claude -p '/api-rest-documentor'",
+    "agent:diagramas": "claude -p '/generador-diagramas'",
+    "agent:tests":     "claude -p '/auditor-cobertura-tests'",
+    "agent:bd":        "claude -p '/documentador-bd'",
+
+    "docs:all": "concurrently --names 'api,diagramas,bd,tests' --prefix-colors 'blue,green,yellow,magenta' 'npm run agent:api' 'npm run agent:diagramas' 'npm run agent:bd' 'npm run agent:tests'"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
